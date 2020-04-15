@@ -72,8 +72,8 @@ async fn delete_snapshot(
         snapshot_id: snapshot.snapshot_id.as_ref().unwrap().to_string(),
     };
 
-    match ec2_client.delete_snapshot(delete_snapshot_request).await {
-        Ok(()) => Ok(snapshot.volume_size.unwrap()),
-        Err(err) => Err(err),
-    }
+    ec2_client
+        .delete_snapshot(delete_snapshot_request)
+        .await
+        .and_then(|_| Ok(snapshot.volume_size.unwrap()))
 }
