@@ -35,12 +35,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Right(p) => Ec2Client::new_with(HttpClient::new()?, p, opt.region),
     };
 
-    println!(
-        "{} GiB freed",
-        delete_snapshots(&ec2_client, opt.apply).await?
-    );
-
-    Ok(())
+    delete_snapshots(&ec2_client, opt.apply).await.map(|state| {
+        println!(
+            "Deleted {} snapshots for a total of {} GiB. Deletion failed on {} case(s).",
+            state.success, state.volume, state.failure
+        )
+    })
 }
 
 fn provide_aws_credentials(
