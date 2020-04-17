@@ -25,13 +25,23 @@ pub async fn describe_snapshots(
         .await
 }
 
+pub struct State {
+    pub success: u64,
+    pub failure: u64,
+    pub volume: i64,
+}
+
 pub async fn delete_snapshots(
     ec2_client: &Ec2Client,
     apply: bool,
-) -> Result<i64, Box<dyn std::error::Error>> {
+) -> Result<State, Box<dyn std::error::Error>> {
     let snapshots = describe_snapshots(&ec2_client, None).await?.snapshots;
 
-    let mut volume = 0;
+    let mut state = State {
+        success: 0,
+        failure: 0,
+        volume: 0,
+    };
 
     if let Some(snapshots) = snapshots.as_ref() {
         for snapshot in snapshots.iter() {
@@ -48,7 +58,13 @@ pub async fn delete_snapshots(
             if let Some(images) = images {
                 if images.is_empty() {
                     if apply {
-                        volume += delete_snapshot(&ec2_client, &snapshot).await?;
+                        match delete_snapshot(&ec2_client, &snapshot).await {
+                            Ok(volume) => {
+                                state.success += 1;
+                                state.volume += volume
+                            }
+                            Err(_) => state.failure += 1,
+                        }
                     } else {
                         println!(
                             "Snapshot {} has no associated AMI and can be deleted",
@@ -60,7 +76,7 @@ pub async fn delete_snapshots(
         }
     }
 
-    Ok(volume)
+    Ok(state)
 }
 
 async fn delete_snapshot(
@@ -72,8 +88,8 @@ async fn delete_snapshot(
         snapshot_id: snapshot.snapshot_id.as_ref().unwrap().to_string(),
     };
 
-    match ec2_client.delete_snapshot(delete_snapshot_request).await {
-        Ok(()) => Ok(snapshot.volume_size.unwrap()),
-        Err(err) => Err(err),
-    }
+    ec2_client
+        .delete_snapshot(delete_snapshot_request)
+        .await
+        .and_then(|_| Ok(snapshot.volume_size.unwrap()))
 }
