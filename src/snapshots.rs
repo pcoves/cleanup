@@ -66,7 +66,7 @@ pub async fn delete_snapshots(
             if let Some(images) = images {
                 if images.is_empty() {
                     let snapshots = hash_map
-                        .entry(snapshot.volume_id.as_ref())
+                        .entry(snapshot.volume_id.as_ref().unwrap())
                         .or_insert(vec![]);
                     snapshots.append(&mut vec![snapshot]);
                 }
@@ -74,7 +74,7 @@ pub async fn delete_snapshots(
         }
     }
 
-    for (_, snapshots) in hash_map.iter_mut() {
+    for (volume_id, snapshots) in hash_map.iter_mut() {
         if snapshots.len() < keep {
             continue;
         }
