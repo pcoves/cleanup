@@ -1,8 +1,10 @@
+use regex::Regex;
 use rusoto_core::RusotoError;
 use rusoto_ec2::{
     filter, DeleteSnapshotError, DeleteSnapshotRequest, DescribeSnapshotsError,
     DescribeSnapshotsRequest, DescribeSnapshotsResult, Ec2, Ec2Client, Filter, Snapshot,
 };
+use std::collections::HashMap;
 
 use crate::images::describe_images;
 
@@ -31,18 +33,28 @@ pub struct State {
     pub volume: i64,
 }
 
+impl State {
+    pub fn new() -> Self {
+        State {
+            success: 0,
+            failure: 0,
+            volume: 0,
+        }
+    }
+}
+
 pub async fn delete_snapshots(
     ec2_client: &Ec2Client,
     apply: bool,
+    keep: usize,
 ) -> Result<State, Box<dyn std::error::Error>> {
+    let mut state = State::new();
+    let mut hash_map = HashMap::new();
+
+    let regex = Regex::new(r"^Created by .* for ami-.* from (?P<volume>vol-.*)$")
+        .expect("Failed to build regex");
+
     let snapshots = describe_snapshots(&ec2_client, None).await?.snapshots;
-
-    let mut state = State {
-        success: 0,
-        failure: 0,
-        volume: 0,
-    };
-
     if let Some(snapshots) = snapshots.as_ref() {
         for snapshot in snapshots.iter() {
             let images = describe_images(
@@ -57,21 +69,45 @@ pub async fn delete_snapshots(
 
             if let Some(images) = images {
                 if images.is_empty() {
-                    if apply {
-                        match delete_snapshot(&ec2_client, &snapshot).await {
-                            Ok(volume) => {
-                                state.success += 1;
-                                state.volume += volume
-                            }
-                            Err(_) => state.failure += 1,
-                        }
-                    } else {
-                        println!(
-                            "Snapshot {} has no associated AMI and can be deleted",
-                            snapshot.snapshot_id.as_ref().unwrap()
-                        );
-                    }
+                    let captures = regex
+                        .captures(
+                            snapshot
+                                .description
+                                .as_ref()
+                                .expect("Failed to retrieve snapshot's description"),
+                        )
+                        .expect("Failed to parse snapshot's description");
+
+                    let volume = captures
+                        .name("volume")
+                        .expect("Failed to extract volume from description")
+                        .as_str();
+
+                    let snapshots = hash_map.entry(volume).or_insert(vec![]);
+                    snapshots.append(&mut vec![snapshot]);
                 }
+            }
+        }
+    }
+
+    for (_, snapshots) in hash_map.iter_mut() {
+        if snapshots.len() < keep {
+            continue;
+        }
+
+        snapshots.sort_by(|lhs, rhs| lhs.start_time.as_ref().cmp(&rhs.start_time.as_ref()));
+
+        for snapshot in snapshots.iter().rev().skip(keep) {
+            if apply {
+                match delete_snapshot(&ec2_client, &snapshot).await {
+                    Ok(volume) => {
+                        state.success += 1;
+                        state.volume += volume
+                    }
+                    Err(_) => state.failure += 1,
+                }
+            } else {
+                state.success += 1;
             }
         }
     }
