@@ -1,4 +1,3 @@
-use regex::Regex;
 use rusoto_core::RusotoError;
 use rusoto_ec2::{
     filter, DeleteSnapshotError, DeleteSnapshotRequest, DescribeSnapshotsError,
@@ -51,9 +50,6 @@ pub async fn delete_snapshots(
     let mut state = State::new();
     let mut hash_map = HashMap::new();
 
-    let regex = Regex::new(r"^Created by .* for ami-.* from (?P<volume>vol-.*)$")
-        .expect("Failed to build regex");
-
     let snapshots = describe_snapshots(&ec2_client, None).await?.snapshots;
     if let Some(snapshots) = snapshots.as_ref() {
         for snapshot in snapshots.iter() {
@@ -69,21 +65,9 @@ pub async fn delete_snapshots(
 
             if let Some(images) = images {
                 if images.is_empty() {
-                    let captures = regex
-                        .captures(
-                            snapshot
-                                .description
-                                .as_ref()
-                                .expect("Failed to retrieve snapshot's description"),
-                        )
-                        .expect("Failed to parse snapshot's description");
-
-                    let volume = captures
-                        .name("volume")
-                        .expect("Failed to extract volume from description")
-                        .as_str();
-
-                    let snapshots = hash_map.entry(volume).or_insert(vec![]);
+                    let snapshots = hash_map
+                        .entry(snapshot.volume_id.as_ref())
+                        .or_insert(vec![]);
                     snapshots.append(&mut vec![snapshot]);
                 }
             }
