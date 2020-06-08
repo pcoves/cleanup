@@ -3,6 +3,7 @@ use rusoto_ec2::{
     filter, DeleteSnapshotError, DeleteSnapshotRequest, DescribeSnapshotsError,
     DescribeSnapshotsRequest, DescribeSnapshotsResult, Ec2, Ec2Client, Filter, Snapshot,
 };
+use std::collections::HashMap;
 
 use crate::images::describe_images;
 
@@ -25,6 +26,7 @@ pub async fn describe_snapshots(
         .await
 }
 
+#[derive(Default)]
 pub struct State {
     pub success: u64,
     pub failure: u64,
@@ -34,15 +36,12 @@ pub struct State {
 pub async fn delete_snapshots(
     ec2_client: &Ec2Client,
     apply: bool,
+    keep: usize,
 ) -> Result<State, Box<dyn std::error::Error>> {
+    let mut state = State::default();
+    let mut hash_map = HashMap::new();
+
     let snapshots = describe_snapshots(&ec2_client, None).await?.snapshots;
-
-    let mut state = State {
-        success: 0,
-        failure: 0,
-        volume: 0,
-    };
-
     if let Some(snapshots) = snapshots.as_ref() {
         for snapshot in snapshots.iter() {
             let images = describe_images(
@@ -57,21 +56,35 @@ pub async fn delete_snapshots(
 
             if let Some(images) = images {
                 if images.is_empty() {
-                    if apply {
-                        match delete_snapshot(&ec2_client, &snapshot).await {
-                            Ok(volume) => {
-                                state.success += 1;
-                                state.volume += volume
-                            }
-                            Err(_) => state.failure += 1,
-                        }
-                    } else {
-                        println!(
-                            "Snapshot {} has no associated AMI and can be deleted",
-                            snapshot.snapshot_id.as_ref().unwrap()
-                        );
-                    }
+                    let snapshots = hash_map
+                        .entry(snapshot.volume_id.as_ref().unwrap())
+                        .or_insert_with(|| vec![]);
+                    snapshots.append(&mut vec![snapshot]);
                 }
+            }
+        }
+    }
+
+    for (volume_id, snapshots) in hash_map.iter_mut() {
+        if snapshots.len() < keep {
+            continue;
+        }
+
+        println!("Volume id : {}", volume_id);
+
+        snapshots.sort_by(|lhs, rhs| lhs.start_time.as_ref().cmp(&rhs.start_time.as_ref()));
+
+        for snapshot in snapshots.iter().rev().skip(keep) {
+            if apply {
+                match delete_snapshot(&ec2_client, &snapshot).await {
+                    Ok(volume) => {
+                        state.success += 1;
+                        state.volume += volume
+                    }
+                    Err(_) => state.failure += 1,
+                }
+            } else {
+                state.success += 1;
             }
         }
     }
