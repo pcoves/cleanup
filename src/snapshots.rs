@@ -79,6 +79,8 @@ pub async fn delete_snapshots(
             continue;
         }
 
+        println!("Volume id : {}", volume_id);
+
         snapshots.sort_by(|lhs, rhs| lhs.start_time.as_ref().cmp(&rhs.start_time.as_ref()));
 
         for snapshot in snapshots.iter().rev().skip(keep) {
