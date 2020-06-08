@@ -26,20 +26,11 @@ pub async fn describe_snapshots(
         .await
 }
 
+#[derive(Default)]
 pub struct State {
     pub success: u64,
     pub failure: u64,
     pub volume: i64,
-}
-
-impl State {
-    pub fn new() -> Self {
-        State {
-            success: 0,
-            failure: 0,
-            volume: 0,
-        }
-    }
 }
 
 pub async fn delete_snapshots(
@@ -47,7 +38,7 @@ pub async fn delete_snapshots(
     apply: bool,
     keep: usize,
 ) -> Result<State, Box<dyn std::error::Error>> {
-    let mut state = State::new();
+    let mut state = State::default();
     let mut hash_map = HashMap::new();
 
     let snapshots = describe_snapshots(&ec2_client, None).await?.snapshots;
