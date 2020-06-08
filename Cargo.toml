@@ -9,7 +9,7 @@ license = "WTFPL"
 
 [dependencies]
 dirs = "2.0.2"
-either = "1.5.*"
+either = "1.5"
 rusoto_core = "0.43"
 rusoto_credential = "0.43"
 rusoto_ec2 = "0.43"
