@@ -58,7 +58,7 @@ pub async fn delete_snapshots(
                 if images.is_empty() {
                     let snapshots = hash_map
                         .entry(snapshot.volume_id.as_ref().unwrap())
-                        .or_insert_with(|| vec![]);
+                        .or_insert_with(Vec::<_>::new);
                     snapshots.append(&mut vec![snapshot]);
                 }
             }

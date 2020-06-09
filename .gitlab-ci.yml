@@ -16,6 +16,17 @@ build:
   except:
     - master
 
+lint:
+  stage: build
+  image: rust:latest
+  before_script:
+    - rustup component add clippy
+    - cargo clippy --version
+  script:
+    - cargo clippy
+  except:
+    - master
+
 test:
   stage: test
   image: rust:latest
@@ -30,7 +41,6 @@ test:
   only:
     - dev
 
-
 deploy:
   stage: deploy
   image:
@@ -39,5 +49,16 @@ deploy:
   script:
     - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > /kaniko/.docker/config.json
     - /kaniko/executor --context $CI_PROJECT_DIR --dockerfile $CI_PROJECT_DIR/Dockerfile --destination $CI_REGISTRY_IMAGE
+  only:
+    - master
+
+doc:
+  stage: deploy
+  image: rust:latest
+  script:
+    - cargo doc
+  artifacts:
+    paths:
+      - $CI_PROJECT_DIR/target/doc
   only:
     - master
