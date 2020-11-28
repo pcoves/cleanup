@@ -29,8 +29,14 @@ struct Opt {
     region: Region,
 }
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() {
+    tokio::runtime::Runtime::new()
+        .unwrap()
+        .block_on(app())
+        .unwrap();
+}
+
+async fn app() -> Result<(), Box<dyn std::error::Error>> {
     let opt = Opt::from_args();
 
     let ec2_client = match provide_aws_credentials(&opt.profile)? {
