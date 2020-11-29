@@ -10,10 +10,11 @@ license = "WTFPL"
 [dependencies]
 dirs = "2.0.2"
 either = "1.5"
+futures = "0.3.*" 
 rusoto_core = "0.43"
 rusoto_credential = "0.43"
 rusoto_ec2 = "0.43"
 rusoto_sts = "0.43"
 structopt = "0.2"
 tini = "0.2"
-tokio = "*"
+tokio = {version = "0.2.*", features = ["full"] }
