@@ -16,6 +16,7 @@ pub async fn describe_images(
         filters,
         image_ids: None,
         owners: Some(vec!["self".to_string()]),
+        include_deprecated: None,
     };
 
     ec2_client.describe_images(describe_images_request).await
