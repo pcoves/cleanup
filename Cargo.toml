@@ -2,6 +2,8 @@
 name = "cleanup"
 version = "0.2.0"
 edition = "2021"
+authors = ["Pablo COVES <pablo.coves@protonmail.com>"]
+licence = "MIT"
 
 [profile.release]
 opt-level = "z"
