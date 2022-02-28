@@ -1,9 +1,7 @@
 [package]
 name = "cleanup"
-version = "0.1.1"
-authors = ["Pablo COVES <pablo.coves@anatoscope.com>"]
-edition = "2018"
-license = "MIT"
+version = "0.2.0"
+edition = "2021"
 
 [profile.release]
 opt-level = "z"
@@ -12,13 +10,9 @@ codegen-units = 1
 panic = "abort"
 
 [dependencies]
-dirs = "4"
-either = "1"
-futures = "0.3"
-rusoto_core = "0.47"
-rusoto_credential = "0.47"
-rusoto_ec2 = "0.47"
-rusoto_sts = "0.47"
-structopt = "0.3"
-tini = "1"
-tokio = {version = "1", features = ["full"] }
+chrono = { version = "0.4" }
+clap = { version = "3", features = ["derive"] }
+rusoto_core = { version = "0.47" }
+rusoto_ec2 = { version = "0.47" }
+thiserror = { version = "1" }
+tokio = { version = "1" }

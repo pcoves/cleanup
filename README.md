@@ -1,47 +1,35 @@
 # Cleanup
 
-## Help
+ [[_TOC_]]
 
 ```
-USAGE:
-    cleanup [FLAGS] [OPTIONS]
+cleanup 0.2.0
+Search for AMI's or orphan Snapshots to delete
 
-FLAGS:
-        --apply      Apply command, defaults to false
-    -h, --help       Prints help information
-    -V, --version    Prints version information
+USAGE:
+    cleanup [OPTIONS] [SUBCOMMAND]
 
 OPTIONS:
-    -p, --profile <profile>     [default: default]
-    -r, --region <region>       [default: EuWest1]
+        --apply              Delete AMIs/Snapshots
+    -h, --help               Print help information
+    -n, --name <NAME>        AMIs name (or prefix if ends with a *)
+    -r, --region <REGION>    [default: eu-west-1]
+    -V, --version            Print version information
+
+SUBCOMMANDS:
+    before    Keep AMIs based on their age
+    help      Print this message or the help of the given subcommand(s)
+    keep      How many AMIs to keep
 ```
 
-## Native
+## Build
 
-```bash
-git clone https://gitlab.com/pcoves/cleanup.git
-cd cleanup
+```
 cargo build
 ```
 
-### Dry run
-
-```bash
-cargo run
-```
-
-Output the list of snapshots tied to no AMI.
-
-### :warning: Apply :warning:
-
-```bash
-cargo run -- --apply
-```
-
-Effectively deletes unused snapshots.
-
-## Docker
+## Install
 
 ```
-docker run --rm -v $HOME/.aws/credentials:/root/.aws/credentials:ro registry.gitlab.com/pcoves/cleanup:latest
+cargo install --path .
 ```
