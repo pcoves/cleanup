@@ -16,5 +16,6 @@ chrono = { version = "0.4" }
 clap = { version = "3", features = ["derive"] }
 rusoto_core = { version = "0.47" }
 rusoto_ec2 = { version = "0.47" }
+rusoto_signature = { version = "0.47" }
 thiserror = { version = "1" }
 tokio = { version = "1" }
