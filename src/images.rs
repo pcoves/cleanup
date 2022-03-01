@@ -1,8 +1,9 @@
 use crate::Result;
 use chrono::{DateTime, Utc};
+pub use rusoto_ec2::Image;
 use rusoto_ec2::{
     filter, DeregisterImageRequest, DescribeImagesRequest, DescribeImagesResult, Ec2, Ec2Client,
-    Filter, Image,
+    Filter,
 };
 
 pub enum DescribeImage {
