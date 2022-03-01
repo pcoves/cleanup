@@ -80,6 +80,11 @@ async fn cleanup_images(
                     Duration::weeks(weeks) + Duration::days(days) + Duration::hours(hours),
                 )
                 .expect("Fail to compute date");
+
+            if !apply {
+                println!("Keeping AMIs younger than {}", date_threshold);
+            }
+
             images = filter_images_by_date(images, date_threshold);
         }
     };
