@@ -8,6 +8,10 @@ pub struct Args {
     #[clap(short, long, default_value = "eu-west-1")]
     pub region: Region,
 
+    /// Custom endpoint for testing purpose.
+    #[clap(short, long)]
+    pub endpoint: Option<String>,
+
     /// AMIs name (or prefix if ends with a *).
     #[clap(short, long)]
     pub name: Option<String>,
