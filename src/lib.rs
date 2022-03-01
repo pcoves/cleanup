@@ -21,14 +21,14 @@ use std::collections::HashMap;
 pub async fn cleanup(ec2_client: &Ec2Client, args: Args) -> Result<()> {
     if let Some(command) = args.command {
         // if let Some(mut images) = describe_images(&ec2_client, args.name.as_ref())
-        if let Some(images) = describe_images(&ec2_client, DescribeImage::Name(args.name))
+        if let Some(images) = describe_images(ec2_client, DescribeImage::Name(args.name))
             .await?
             .images
         {
-            cleanup_images(&ec2_client, images, command, args.apply).await?
+            cleanup_images(ec2_client, images, command, args.apply).await?
         }
-    } else if let Some(snapshots) = decribe_snapshots(&ec2_client).await?.snapshots {
-        cleanup_snapshots(&ec2_client, snapshots, args.apply).await?;
+    } else if let Some(snapshots) = decribe_snapshots(ec2_client).await?.snapshots {
+        cleanup_snapshots(ec2_client, snapshots, args.apply).await?;
     }
 
     Ok(())
@@ -48,7 +48,7 @@ async fn cleanup_images(
             image_instances
                 .entry(image_id.clone())
                 .or_insert_with(Vec::new)
-                .push(describe_instances(&ec2_client, image_id).await?);
+                .push(describe_instances(ec2_client, image_id).await?);
         }
         image_instances
     };
@@ -103,10 +103,10 @@ async fn cleanup_images(
                 })
                 .collect::<Vec<_>>();
 
-            deregister_image(&ec2_client, image.image_id.as_ref().unwrap().clone()).await?;
+            deregister_image(ec2_client, image.image_id.as_ref().unwrap().clone()).await?;
 
             for snapshot_id in snapshots_id {
-                delete_snapshot(&ec2_client, snapshot_id).await?;
+                delete_snapshot(ec2_client, snapshot_id).await?;
             }
         }
     } else {
@@ -130,7 +130,7 @@ async fn cleanup_snapshots(
                 .entry(snapshot_id.clone())
                 .or_insert_with(Vec::new)
                 .push(
-                    describe_images(&ec2_client, DescribeImage::Snapshot(snapshot_id.clone()))
+                    describe_images(ec2_client, DescribeImage::Snapshot(snapshot_id.clone()))
                         .await?,
                 );
         }
@@ -155,7 +155,7 @@ async fn cleanup_snapshots(
 
     if apply {
         for snapshot in snapshots {
-            delete_snapshot(&ec2_client, snapshot.snapshot_id.unwrap()).await?;
+            delete_snapshot(ec2_client, snapshot.snapshot_id.unwrap()).await?;
         }
     } else {
         println!("Orphans: {}", snapshots.len());
