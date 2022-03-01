@@ -1,4 +1,5 @@
 use crate::Result;
+pub use rusoto_ec2::Snapshot;
 use rusoto_ec2::{
     DeleteSnapshotRequest, DescribeSnapshotsRequest, DescribeSnapshotsResult, Ec2, Ec2Client,
 };
