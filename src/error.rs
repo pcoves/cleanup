@@ -1,25 +1,31 @@
 use rusoto_core::RusotoError;
 use rusoto_ec2::{
-    DeleteSnapshotError, DeregisterImageError, DescribeImagesError, DescribeInstancesError,
-    DescribeSnapshotsError,
+    DeleteSnapshotError, DeleteVolumeError, DeregisterImageError, DescribeImagesError,
+    DescribeInstancesError, DescribeSnapshotsError, DescribeVolumesError,
 };
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error(transparent)]
-    Images(#[from] RusotoError<DescribeImagesError>),
+    DescribeImages(#[from] RusotoError<DescribeImagesError>),
 
     #[error(transparent)]
-    Deregister(#[from] RusotoError<DeregisterImageError>),
+    DeregisterImage(#[from] RusotoError<DeregisterImageError>),
 
     #[error(transparent)]
-    Instances(#[from] RusotoError<DescribeInstancesError>),
+    DescribeInstances(#[from] RusotoError<DescribeInstancesError>),
 
     #[error(transparent)]
-    Snapshots(#[from] RusotoError<DescribeSnapshotsError>),
+    DescribeSnapshots(#[from] RusotoError<DescribeSnapshotsError>),
 
     #[error(transparent)]
-    Delete(#[from] RusotoError<DeleteSnapshotError>),
+    DeleteSnapshot(#[from] RusotoError<DeleteSnapshotError>),
+
+    #[error(transparent)]
+    DescribeVolumes(#[from] RusotoError<DescribeVolumesError>),
+
+    #[error(transparent)]
+    DeleteVolume(#[from] RusotoError<DeleteVolumeError>),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

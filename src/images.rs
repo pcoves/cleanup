@@ -6,20 +6,33 @@ use rusoto_ec2::{
     Filter,
 };
 
-pub enum DescribeImage {
-    Name(Option<String>),
-    Snapshot(String),
+#[derive(Default)]
+pub struct DescribeImage {
+    pub name: Option<String>,
+    pub tag: Option<String>,
+    pub snapshot_id: Option<String>,
 }
 
 impl DescribeImage {
-    pub fn filters(&self) -> Vec<Filter> {
-        match self {
-            Self::Name(Some(name)) => vec![filter!("name", name)],
-            Self::Name(None) => vec![],
-            Self::Snapshot(snapshot_id) => {
-                vec![filter!("block-device-mapping.snapshot-id", snapshot_id)]
-            }
+    pub fn filters(self) -> Vec<Filter> {
+        let mut filters = vec![];
+
+        if let Some(filter) = self.name.map(|name| filter!("name", name)) {
+            filters.push(filter);
         }
+
+        if let Some(filter) = self.tag.map(|tag| filter!("tag:Name", tag)) {
+            filters.push(filter);
+        }
+
+        if let Some(filter) = self
+            .snapshot_id
+            .map(|snapshot_id| filter!("block-device-mapping.snapshot-id", snapshot_id))
+        {
+            filters.push(filter);
+        }
+
+        filters
     }
 }
 

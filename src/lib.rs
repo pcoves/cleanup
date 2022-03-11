@@ -1,8 +1,9 @@
-pub mod args;
 pub mod error;
 mod images;
 mod instances;
+pub mod options;
 mod snapshots;
+mod volumes;
 
 use crate::{
     error::Result,
@@ -11,24 +12,53 @@ use crate::{
         sort_images_by_creation_date, DescribeImage, Image,
     },
     instances::describe_instances,
-    snapshots::{decribe_snapshots, delete_snapshot, Snapshot},
+    snapshots::{delete_snapshot, describe_snapshots, pretty_print_snapshots, Snapshot},
+    volumes::{delete_volume, describe_volumes, pretty_print_volumes, DescribeVolumes, Volume},
 };
-use args::{Args, Before, Command, Keep};
 use chrono::{Duration, Utc};
+use options::{Before, Command, Keep, Options, SubCommand};
 use rusoto_ec2::Ec2Client;
 use std::collections::HashMap;
 
-pub async fn cleanup(ec2_client: &Ec2Client, args: Args) -> Result<()> {
-    if let Some(command) = args.command {
-        // if let Some(mut images) = describe_images(&ec2_client, args.name.as_ref())
-        if let Some(images) = describe_images(ec2_client, DescribeImage::Name(args.name))
+pub async fn cleanup(ec2_client: &Ec2Client, options: Options) -> Result<()> {
+    match options.command {
+        Command::Ami(ami) => {
+            if let Some(images) = describe_images(
+                ec2_client,
+                DescribeImage {
+                    name: ami.name,
+                    tag: ami.tag,
+                    ..Default::default()
+                },
+            )
             .await?
             .images
-        {
-            cleanup_images(ec2_client, images, command, args.apply).await?
+            {
+                cleanup_images(ec2_client, images, ami.subcommand, options.apply).await?
+            }
         }
-    } else if let Some(snapshots) = decribe_snapshots(ec2_client).await?.snapshots {
-        cleanup_snapshots(ec2_client, snapshots, args.apply).await?;
+        Command::Snapshot(snapshot) => {
+            if let Some(snapshots) = describe_snapshots(ec2_client, snapshot.name)
+                .await?
+                .snapshots
+            {
+                cleanup_snapshots(ec2_client, snapshots, options.apply).await?;
+            }
+        }
+        Command::Volume(volume) => {
+            if let Some(volumes) = describe_volumes(
+                ec2_client,
+                DescribeVolumes {
+                    name: volume.name,
+                    ..Default::default()
+                },
+            )
+            .await?
+            .volumes
+            {
+                cleanup_volumes(ec2_client, volumes, options.apply).await?;
+            }
+        }
     }
 
     Ok(())
@@ -37,7 +67,7 @@ pub async fn cleanup(ec2_client: &Ec2Client, args: Args) -> Result<()> {
 async fn cleanup_images(
     ec2_client: &Ec2Client,
     mut images: Vec<Image>,
-    command: Command,
+    command: SubCommand,
     apply: bool,
 ) -> Result<()> {
     // Get all instances using the current image
@@ -69,12 +99,12 @@ async fn cleanup_images(
         })
         .collect::<Vec<_>>();
 
-    match command {
-        Command::Keep(Keep { keep }) => {
+    images = match command {
+        SubCommand::Keep(Keep { keep }) => {
             sort_images_by_creation_date(&mut images);
-            images = images.into_iter().skip(keep).collect::<Vec<_>>();
+            images.into_iter().skip(keep).collect::<Vec<_>>()
         }
-        Command::Before(Before { hours, days, weeks }) => {
+        SubCommand::Before(Before { hours, days, weeks }) => {
             let date_threshold = Utc::now()
                 .checked_sub_signed(
                     Duration::weeks(weeks) + Duration::days(days) + Duration::hours(hours),
@@ -85,7 +115,7 @@ async fn cleanup_images(
                 println!("Keeping AMIs younger than {}", date_threshold);
             }
 
-            images = filter_images_by_date(images, date_threshold);
+            filter_images_by_date(images, date_threshold)
         }
     };
 
@@ -111,11 +141,26 @@ async fn cleanup_images(
             deregister_image(ec2_client, image.image_id.as_ref().unwrap().clone()).await?;
 
             for snapshot_id in snapshots_id {
-                delete_snapshot(ec2_client, snapshot_id).await?;
+                delete_snapshot(ec2_client, snapshot_id.clone()).await?;
+
+                if let Some(volumes) = describe_volumes(
+                    ec2_client,
+                    DescribeVolumes {
+                        snapshot_id: Some(snapshot_id),
+                        ..Default::default()
+                    },
+                )
+                .await?
+                .volumes
+                {
+                    for volume in volumes {
+                        delete_volume(ec2_client, volume.volume_id.unwrap()).await?;
+                    }
+                };
             }
         }
     } else {
-        println!("Length: {}", images.len());
+        println!("Matching images: {}", images.len());
         pretty_print_images(&images);
     }
 
@@ -135,8 +180,14 @@ async fn cleanup_snapshots(
                 .entry(snapshot_id.clone())
                 .or_insert_with(Vec::new)
                 .push(
-                    describe_images(ec2_client, DescribeImage::Snapshot(snapshot_id.clone()))
-                        .await?,
+                    describe_images(
+                        ec2_client,
+                        DescribeImage {
+                            snapshot_id: Some(snapshot_id.to_string()),
+                            ..Default::default()
+                        },
+                    )
+                    .await?,
                 );
         }
         snapshot_images
@@ -161,13 +212,31 @@ async fn cleanup_snapshots(
     if apply {
         for snapshot in snapshots {
             delete_snapshot(ec2_client, snapshot.snapshot_id.unwrap()).await?;
+            delete_volume(ec2_client, snapshot.volume_id.unwrap()).await?;
         }
     } else {
-        println!("Orphans: {}", snapshots.len());
-        for snapshot in snapshots {
-            println!("{}", snapshot.snapshot_id.as_ref().unwrap());
-        }
+        pretty_print_snapshots(&snapshots);
     }
 
+    Ok(())
+}
+
+async fn cleanup_volumes(
+    ec2_client: &Ec2Client,
+    mut volumes: Vec<Volume>,
+    apply: bool,
+) -> Result<()> {
+    volumes = volumes
+        .into_iter()
+        .filter(|volume| volume.snapshot_id.is_some())
+        .collect();
+
+    if apply {
+        for volume in volumes {
+            delete_volume(ec2_client, volume.volume_id.unwrap()).await?;
+        }
+    } else {
+        pretty_print_volumes(&volumes);
+    }
     Ok(())
 }
