@@ -1,18 +1,16 @@
 use clap::{Args, Parser, Subcommand};
-use rusoto_core::Region;
 
-/// Search for AMI's or orphan Snapshots to delete.
+/// Search for Image's or orphan Snapshots/Volume to delete.
 #[derive(Debug, Parser)]
 #[clap(author, version, about, long_about = None)]
 pub struct Options {
     #[clap(short, long, default_value = "eu-west-1")]
-    pub region: Region,
+    pub region: String,
 
-    /// Custom endpoint for testing purpose.
-    #[clap(short, long)]
-    pub endpoint: Option<String>,
+    #[clap(short, long, default_value = "default")]
+    pub profile: String,
 
-    /// Delete AMIs/Snapshots.
+    /// Delete Images/Snapshots.
     #[clap(long)]
     pub apply: bool,
 
@@ -29,8 +27,8 @@ pub enum Command {
     /// Search for orphaned snaphots to delete.
     Snapshot(Snapshot),
 
-    /// Search for unused AMIs to delete.
-    Ami(Ami),
+    /// Search for unused images to delete.
+    Image(Image),
 }
 
 #[derive(Debug, Args)]
@@ -48,12 +46,12 @@ pub struct Snapshot {
 }
 
 #[derive(Debug, Args)]
-pub struct Ami {
+pub struct Image {
     /// Filter by Tag:Name.
     #[clap(short, long)]
     pub tag: Option<String>,
 
-    /// Filter by AMI name/prefix,
+    /// Filter by image name/prefix,
     #[clap(short, long)]
     pub name: Option<String>,
 
@@ -63,16 +61,16 @@ pub struct Ami {
 
 #[derive(Debug, Subcommand)]
 pub enum SubCommand {
-    /// How many AMIs to keep.
+    /// How many images to keep.
     Keep(Keep),
 
-    /// AMI's expiration date.
+    /// Image's expiration date.
     Before(Before),
 }
 
 #[derive(Debug, Parser)]
 pub struct Keep {
-    /// How many matching AMIs to keep.
+    /// How many matching images to keep.
     #[clap(default_value_t = 2)]
     pub keep: usize,
 }

@@ -7,68 +7,23 @@
 ### Help
 
 ```
-Search for AMI's or orphan Snapshots to delete
+Search for Image's or orphan Snapshots/Volume to delete
 
 USAGE:
     cleanup [OPTIONS] <SUBCOMMAND>
 
 OPTIONS:
-        --apply                  Delete AMIs/Snapshots
-    -e, --endpoint <ENDPOINT>    Custom endpoint for testing purpose
+        --apply                  Delete Images/Snapshots
     -h, --help                   Print help information
+    -p, --profile <PROFILE>      [default: default]
     -r, --region <REGION>        [default: eu-west-1]
     -V, --version                Print version information
 
 SUBCOMMANDS:
-    ami         Search for unused AMIs to delete
     help        Print this message or the help of the given subcommand(s)
+    image       Search for unused images to delete
     snapshot    Search for orphaned snaphots to delete
     volume      Search for orphaned volumes to delete
-```
-
-### Volume
-
-```
-Search for orphaned volumes to delete
-
-USAGE:
-    cleanup volume [OPTIONS]
-
-OPTIONS:
-    -h, --help           Print help information
-    -n, --name <NAME>    Filter by Tag:Name
-```
-
-### Snapshot
-
-```
-Search for orphaned snaphots to delete
-
-USAGE:
-    cleanup snapshot [OPTIONS]
-
-OPTIONS:
-    -h, --help           Print help information
-    -n, --name <NAME>    Filter by Tag:Name
-```
-
-### AMI
-
-```
-Search for unused AMIs to delete
-
-USAGE:
-    cleanup ami [OPTIONS] <SUBCOMMAND>
-
-OPTIONS:
-    -h, --help           Print help information
-    -n, --name <NAME>    Filter by AMI name/prefix,
-    -t, --tag <TAG>      Filter by Tag:Name
-
-SUBCOMMANDS:
-    before    AMI's expiration date
-    help      Print this message or the help of the given subcommand(s)
-    keep      How many AMIs to keep
 ```
 
 ## Build

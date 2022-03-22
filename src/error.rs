@@ -1,31 +1,29 @@
-use rusoto_core::RusotoError;
-use rusoto_ec2::{
-    DeleteSnapshotError, DeleteVolumeError, DeregisterImageError, DescribeImagesError,
-    DescribeInstancesError, DescribeSnapshotsError, DescribeVolumesError,
+use aws_sdk_ec2::{
+    error::{DeleteSnapshotError, DescribeSnapshotsError},
+    error::{DeleteVolumeError, DescribeVolumesError},
+    error::{DeregisterImageError, DescribeImagesError},
+    types::SdkError,
 };
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error(transparent)]
-    DescribeImages(#[from] RusotoError<DescribeImagesError>),
+    DescribeImages(#[from] SdkError<DescribeImagesError>),
 
     #[error(transparent)]
-    DeregisterImage(#[from] RusotoError<DeregisterImageError>),
+    DeregisterImage(#[from] SdkError<DeregisterImageError>),
 
     #[error(transparent)]
-    DescribeInstances(#[from] RusotoError<DescribeInstancesError>),
+    DescribeSnapshots(#[from] SdkError<DescribeSnapshotsError>),
 
     #[error(transparent)]
-    DescribeSnapshots(#[from] RusotoError<DescribeSnapshotsError>),
+    DeleteSnapshot(#[from] SdkError<DeleteSnapshotError>),
 
     #[error(transparent)]
-    DeleteSnapshot(#[from] RusotoError<DeleteSnapshotError>),
+    DescribeVolumes(#[from] SdkError<DescribeVolumesError>),
 
     #[error(transparent)]
-    DescribeVolumes(#[from] RusotoError<DescribeVolumesError>),
-
-    #[error(transparent)]
-    DeleteVolume(#[from] RusotoError<DeleteVolumeError>),
+    DeleteVolume(#[from] SdkError<DeleteVolumeError>),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
