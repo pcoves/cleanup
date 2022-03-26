@@ -1,3 +1,4 @@
+use chrono::{DateTime, Duration, Utc};
 use clap::{Args, Parser, Subcommand};
 
 /// Search for Image's or orphan Snapshots/Volume to delete.
@@ -83,4 +84,16 @@ pub struct Before {
     pub days: i64,
     #[clap(short('W'), long, default_value_t = 0)]
     pub weeks: i64,
+}
+
+impl Into<DateTime<Utc>> for Before {
+    fn into(self) -> DateTime<Utc> {
+        Utc::now()
+            .checked_sub_signed(
+                Duration::weeks(self.weeks)
+                    + Duration::days(self.days)
+                    + Duration::hours(self.hours),
+            )
+            .expect("Invalid date")
+    }
 }
