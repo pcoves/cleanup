@@ -65,7 +65,7 @@ pub struct Images<'a> {
 
 impl<'a> Images<'a> {
     pub async fn new(client: &'a Client, describe_images: DescribeImages) -> Result<Images<'a>> {
-        Ok(Self {
+        let images = Self {
             client,
             output: client
                 .describe_images()
@@ -74,28 +74,46 @@ impl<'a> Images<'a> {
                 .send()
                 .await?,
         }
-        .sort())
-    }
+        .sort();
 
-    pub async fn keep(&self, keep: usize) -> Result<()> {
-        if let Some(images) = self.output.images() {
-            join_all(
-                images
-                    .iter()
-                    .skip(keep)
-                    .map(|image| self.deregister_image(image)),
-            )
-            .await;
+        if let Some(images) = images.output.images() {
+            log::info!("Found {} matching images", images.len());
         }
 
+        Ok(images.unused().await?)
+    }
+
+    pub async fn deregister(&self) -> Result<()> {
+        if let Some(images) = self.output.images() {
+            join_all(images.iter().map(|image| self.deregister_image(image))).await;
+        }
         Ok(())
     }
 
-    pub async fn before(&self, before: DateTime<Utc>) -> Result<()> {
-        if let Some(images) = self.output.images() {
-            join_all(
+    pub fn keep(self, keep: usize) -> Self {
+        let output = DescribeImagesOutput::builder()
+            .set_images(
+                self.output
+                    .images
+                    .map(|images| images.into_iter().skip(keep).collect::<Vec<_>>()),
+            )
+            .build();
+
+        if let Some(images) = output.images() {
+            log::info!("Will delete {} images and associated data", images.len());
+        }
+
+        Self {
+            client: self.client,
+            output,
+        }
+    }
+
+    pub fn before(self, before: DateTime<Utc>) -> Self {
+        let output = DescribeImagesOutput::builder()
+            .set_images(self.output.images.map(|images| {
                 images
-                    .iter()
+                    .into_iter()
                     .filter(|image| {
                         image
                             .creation_date()
@@ -104,11 +122,70 @@ impl<'a> Images<'a> {
                             .unwrap()
                             < before
                     })
-                    .map(|image| self.deregister_image(image)),
+                    .collect::<Vec<_>>()
+            }))
+            .build();
+
+        if let Some(images) = output.images() {
+            log::info!("Kept {} images", images.len());
+        }
+
+        Self {
+            client: self.client,
+            output,
+        }
+    }
+
+    async fn is_image_used(client: &'a Client, image: &Image) -> Result<bool> {
+        if let Some(reservations) = client
+            .describe_instances()
+            .set_filters(Some(vec![Filter::builder()
+                .set_name(Some(("image-id").to_owned()))
+                .set_values(Some(vec![image.image_id().unwrap().to_string()]))
+                .build()]))
+            .send()
+            .await?
+            .reservations()
+        {
+            Ok(!reservations.is_empty())
+        } else {
+            Ok(false)
+        }
+    }
+
+    async fn unused(self) -> Result<Images<'a>> {
+        if let Some(images) = self.output.images {
+            let status = join_all(
+                images
+                    .iter()
+                    .map(|image| Self::is_image_used(self.client, image)),
             )
             .await;
+
+            // TODO: this might be enhanced using filter_map.
+            let image_status = std::iter::zip(images, status);
+
+            let filtered = image_status
+                .into_iter()
+                .filter(|(_, status)| !*status.as_ref().unwrap())
+                .collect::<Vec<_>>();
+
+            let images = filtered
+                .into_iter()
+                .map(|(image, _)| image)
+                .collect::<Vec<_>>();
+
+            log::info!("Found {} unused images", images.len());
+
+            Ok(Self {
+                client: self.client,
+                output: DescribeImagesOutput::builder()
+                    .set_images(Some(images))
+                    .build(),
+            })
+        } else {
+            Ok(self)
         }
-        Ok(())
     }
 
     fn sort(mut self) -> Self {

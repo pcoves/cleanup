@@ -1,4 +1,5 @@
 use aws_sdk_ec2::{
+    error::DescribeInstancesError,
     error::{DeleteSnapshotError, DescribeSnapshotsError},
     error::{DeleteVolumeError, DescribeVolumesError},
     error::{DeregisterImageError, DescribeImagesError},
@@ -7,6 +8,9 @@ use aws_sdk_ec2::{
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
+    #[error(transparent)]
+    DescribeInstances(#[from] SdkError<DescribeInstancesError>),
+
     #[error(transparent)]
     DescribeImages(#[from] SdkError<DescribeImagesError>),
 

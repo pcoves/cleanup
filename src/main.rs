@@ -18,6 +18,7 @@ async fn main() -> Result<()> {
     env_logger::init();
 
     let options: Options = Options::parse();
+    log::info!("Options are: {options:?}");
 
     std::env::set_var("AWS_PROFILE", options.profile);
     std::env::set_var("AWS_REGION", options.region);
@@ -56,11 +57,13 @@ async fn main() -> Result<()> {
             )
             .await
             {
+                let images = match command.subcommand {
+                    SubCommand::Keep(keep) => images.keep(keep.keep),
+                    SubCommand::Before(before) => images.before(before.into()),
+                };
+
                 if command.apply {
-                    match command.subcommand {
-                        SubCommand::Keep(keep) => images.keep(keep.keep).await?,
-                        SubCommand::Before(before) => images.before(before.into()).await?,
-                    }
+                    images.deregister().await?
                 } else {
                     println!("{images}");
                 }
