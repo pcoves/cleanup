@@ -25,7 +25,7 @@ async fn main() -> Result<()> {
     match options.command {
         Command::Volume(command) => {
             if let Ok(volumes) = Volumes::new(&client, DescribeVolumes::name(command.name)).await {
-                if options.apply {
+                if command.apply {
                     volumes.delete().await?;
                 } else {
                     println!("{volumes}");
@@ -36,7 +36,7 @@ async fn main() -> Result<()> {
             if let Ok(snapshots) =
                 Snapshots::new(&client, DescribeSnapshots::name(command.name)).await
             {
-                if options.apply {
+                if command.apply {
                     snapshots.delete().await?;
                 } else {
                     println!("{snapshots}");
@@ -54,7 +54,7 @@ async fn main() -> Result<()> {
             )
             .await
             {
-                if options.apply {
+                if command.apply {
                     match command.subcommand {
                         SubCommand::Keep(keep) => images.keep(keep.keep).await?,
                         SubCommand::Before(before) => images.before(before.into()).await?,

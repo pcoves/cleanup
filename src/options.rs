@@ -11,10 +11,6 @@ pub struct Options {
     #[clap(short, long, default_value = "default")]
     pub profile: String,
 
-    /// Delete Images/Snapshots.
-    #[clap(long)]
-    pub apply: bool,
-
     /// If no command, handles orphan snapshots.
     #[clap(subcommand)]
     pub command: Command,
@@ -34,6 +30,10 @@ pub enum Command {
 
 #[derive(Debug, Args)]
 pub struct Volume {
+    /// Effectively deletes volumes
+    #[clap(long)]
+    pub apply: bool,
+
     /// Filter by Tag:Name.
     #[clap(short, long)]
     pub name: Option<String>,
@@ -41,6 +41,10 @@ pub struct Volume {
 
 #[derive(Debug, Args)]
 pub struct Snapshot {
+    /// Effectively deletes snapshots
+    #[clap(long)]
+    pub apply: bool,
+
     /// Filter by Tag:Name.
     #[clap(short, long)]
     pub name: Option<String>,
@@ -48,6 +52,10 @@ pub struct Snapshot {
 
 #[derive(Debug, Args)]
 pub struct Image {
+    /// Effectively deletes images
+    #[clap(long)]
+    pub apply: bool,
+
     /// Filter by Tag:Name.
     #[clap(short, long)]
     pub tag: Option<String>,
