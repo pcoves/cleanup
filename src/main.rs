@@ -15,6 +15,8 @@ use aws_sdk_ec2::Client;
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    env_logger::init();
+
     let options: Options = Options::parse();
 
     std::env::set_var("AWS_PROFILE", options.profile);

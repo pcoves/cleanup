@@ -15,6 +15,8 @@ panic = "abort"
 aws-config     = { version = "0.15"                                        }
 aws-sdk-ec2    = { version = "0.15"                                        }
 
+log            = { version = "0.4"                                         }
+env_logger     = { version = "0.9"                                         }
 chrono         = { version = "0.4"                                         }
 clap           = { version = "3", features = ["derive"]                    }
 futures        = { version = "0.3"                                         }
