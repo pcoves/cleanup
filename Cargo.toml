@@ -20,3 +20,8 @@ clap           = { version = "3", features = ["derive"]                    }
 futures        = { version = "0.3"                                         }
 thiserror      = { version = "1"                                           }
 tokio          = { version = "1", features = ["macros", "rt-multi-thread"] }
+
+[build-dependencies]
+chrono        = { version = "0.4"                      }
+clap          = { version = "3", features = ["derive"] }
+clap_complete = { version = "3"                        }
