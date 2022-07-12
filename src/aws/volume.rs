@@ -1,6 +1,11 @@
 use crate::error::Result;
-use aws_sdk_ec2::{model::Filter, output::DescribeVolumesOutput, Client};
+use aws_sdk_ec2::{
+    model::{Filter, Volume},
+    output::DescribeVolumesOutput,
+    Client,
+};
 use futures::future::join_all;
+use serde::{Deserialize, Serialize};
 
 #[derive(Default)]
 pub struct DescribeVolumes {
@@ -55,13 +60,13 @@ impl From<DescribeVolumes> for Filters {
     }
 }
 
-pub struct Volumes<'a> {
+pub struct Builder<'a> {
     client: &'a Client,
     output: DescribeVolumesOutput,
 }
 
-impl<'a> Volumes<'a> {
-    pub async fn new(client: &'a Client, describe_volumes: DescribeVolumes) -> Result<Volumes<'a>> {
+impl<'a> Builder<'a> {
+    pub async fn new(client: &'a Client, describe_volumes: DescribeVolumes) -> Result<Builder<'a>> {
         Ok(Self {
             client,
             output: client
@@ -72,76 +77,68 @@ impl<'a> Volumes<'a> {
         })
     }
 
-    pub async fn delete(&self) -> Result<()> {
-        if let Some(volumes) = self.output.volumes() {
-            join_all(volumes.iter().map(|volume| {
-                self.client
-                    .delete_volume()
-                    .volume_id(volume.volume_id().unwrap())
-                    .send()
-            }))
-            .await;
-        }
-        Ok(())
+    pub async fn build(self) -> Volumes {
+        Volumes(if let Some(volumes) = self.output.volumes() {
+            Some(join_all(volumes.iter().map(|volume| Info::new(self.client, volume))).await)
+        } else {
+            None
+        })
     }
 }
 
-impl<'a> std::fmt::Display for Volumes<'a> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let Some(volumes) = self.output.volumes() {
-            let (mut id, mut name, mut total): (usize, usize, usize) = (0, 0, 0);
+#[derive(Serialize, Deserialize)]
+pub struct Info {
+    id: String,
+    name: String,
+    size: i32,
+}
 
-            for volume in volumes {
-                let len = volume
-                    .volume_id
-                    .as_ref()
-                    .map(|volume_id| volume_id.len())
-                    .unwrap_or(0);
-
-                if len > id {
-                    id = len;
-                }
-
-                if let Some(tags) = volume.tags() {
-                    if let Some(tag) = tags
-                        .iter()
-                        .find(|tag| tag.key() == Some(&"Name".to_owned()))
-                    {
-                        let len = tag.value().map(|value| value.len()).unwrap_or(0);
-                        if len > name {
-                            name = len;
-                        }
-                    }
-                }
-
-                total += volume.size().unwrap_or(0) as usize;
-            }
-            let size = total.to_string().len();
-
-            writeln!(f, "| {:id$} | {:name$} | {:>size$} |", "ID", "Name", "Size")?;
-
-            for volume in volumes {
-                let volume_id = volume.volume_id.as_ref().unwrap();
-                let volume_name = volume
-                    .tags()
-                    .unwrap_or(&[])
-                    .iter()
-                    .find(|tag| tag.key() == Some(&"Name".to_owned()))
-                    .map(|tag| tag.value().unwrap())
-                    .unwrap_or("");
-                let volume_size = volume.size().unwrap_or(0);
-
-                writeln!(
-                    f,
-                    "| {:id$} | {:name$} | {:>size$}Go |",
-                    volume_id, volume_name, volume_size
-                )?;
-            }
-
-            let size = id + name + total.to_string().len();
-            writeln!(f, "| Total {:>size$}Go |", total)
-        } else {
-            writeln!(f, "No volumes found")
+impl Info {
+    pub async fn new(_client: &Client, volume: &Volume) -> Self {
+        Self {
+            id: volume
+                .volume_id()
+                .expect("Failed to read volume ID")
+                .to_string(),
+            name: volume
+                .tags()
+                .unwrap_or(&[])
+                .iter()
+                .find(|tag| tag.key() == Some(&"Name".to_owned()))
+                .map(|tag| tag.value().unwrap())
+                .unwrap_or("")
+                .to_string(),
+            size: volume.size().expect("Failed to read volume's size"),
         }
+    }
+
+    pub async fn delete(&self, client: &Client) -> Result<()> {
+        Ok(client
+            .delete_volume()
+            .volume_id(&self.id)
+            .send()
+            .await
+            .and_then(|_| Ok(()))?)
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct Volumes(Option<Vec<Info>>);
+
+impl Volumes {
+    pub async fn cleanup(&self, client: &Client) {
+        if let Some(volumes) = &self.0 {
+            join_all(volumes.iter().map(|volume| volume.delete(client))).await;
+        }
+    }
+}
+
+impl std::fmt::Display for Volumes {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(
+            f,
+            "{}",
+            serde_json::to_string_pretty(&self).expect("Serialization failure")
+        )
     }
 }

@@ -1,5 +1,6 @@
 use chrono::{DateTime, Duration, Utc};
 use clap::{Args, Parser, Subcommand};
+use std::path::PathBuf;
 
 /// Search for Image's or orphan Snapshots/Volume to delete.
 #[derive(Debug, Parser)]
@@ -26,6 +27,9 @@ pub enum Command {
 
     /// Search for unused images to delete.
     Image(Image),
+
+    /// Read previously generated resource list to delete.
+    Read(Read),
 }
 
 #[derive(Debug, Args)]
@@ -37,6 +41,10 @@ pub struct Volume {
     /// Filter by Tag:Name.
     #[clap(short, long)]
     pub name: Option<String>,
+
+    /// Save result for later deletion
+    #[clap(short, long)]
+    pub output: Option<PathBuf>,
 }
 
 #[derive(Debug, Args)]
@@ -48,6 +56,10 @@ pub struct Snapshot {
     /// Filter by Tag:Name.
     #[clap(short, long)]
     pub name: Option<String>,
+
+    /// Save result for later deletion
+    #[clap(short, long)]
+    pub output: Option<PathBuf>,
 }
 
 #[derive(Debug, Args)]
@@ -63,6 +75,10 @@ pub struct Image {
     /// Filter by image name/prefix,
     #[clap(short, long)]
     pub name: Option<String>,
+
+    /// Save result for later deletion
+    #[clap(short, long)]
+    pub output: Option<PathBuf>,
 
     #[clap(subcommand)]
     pub subcommand: SubCommand,
@@ -104,4 +120,14 @@ impl Into<DateTime<Utc>> for Before {
             )
             .expect("Invalid date")
     }
+}
+
+#[derive(Debug, Args)]
+pub struct Read {
+    /// Effectively deletes images
+    #[clap(long)]
+    pub apply: bool,
+
+    /// Path to read data from
+    pub path: PathBuf,
 }
