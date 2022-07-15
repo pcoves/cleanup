@@ -69,6 +69,18 @@ async fn main() -> Result<()> {
             )
             .await
             {
+                let builder = if let Some(names) = command.exclude_names {
+                    builder.exclude_names(names)
+                } else {
+                    builder
+                };
+
+                let builder = if let Some(tags) = command.exclude_tags {
+                    builder.exclude_tags(tags)
+                } else {
+                    builder
+                };
+
                 let builder = match command.subcommand {
                     SubCommand::Keep(keep) => builder.keep(keep.keep),
                     SubCommand::Before(before) => builder.before(before.into()),

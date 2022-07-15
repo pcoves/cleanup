@@ -68,13 +68,21 @@ pub struct Image {
     #[clap(long)]
     pub apply: bool,
 
-    /// Filter by Tag:Name.
+    /// Filter by Tags
     #[clap(short, long)]
     pub tags: Option<Vec<String>>,
+
+    /// Exclude images with matching tags
+    #[clap(short = 'T', long)]
+    pub exclude_tags: Option<Vec<String>>,
 
     /// Filter by image name/prefix,
     #[clap(short, long)]
     pub names: Option<Vec<String>>,
+
+    /// Exclude images with matching names
+    #[clap(short = 'N', long)]
+    pub exclude_names: Option<Vec<String>>,
 
     /// Save result for later deletion
     #[clap(short, long)]

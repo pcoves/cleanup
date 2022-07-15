@@ -10,6 +10,7 @@ use aws_sdk_ec2::{
 use chrono::{DateTime, Utc};
 use futures::future::join_all;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 #[derive(Default)]
 pub struct DescribeImages {
@@ -33,13 +34,25 @@ impl From<DescribeImages> for Filters {
             )
         }
 
-        if describe_images.tags.is_some() {
-            filters.push(
-                Filter::builder()
-                    .set_name(Some("tag:Name".to_owned()))
-                    .set_values(describe_images.tags)
-                    .build(),
-            )
+        if let Some(tags) = describe_images.tags {
+            let mut key_values = HashMap::new();
+
+            for tag in tags {
+                let mut splits = tag.split(" ");
+                key_values
+                    .entry(splits.next().expect("Failed to read tag's key").to_string())
+                    .or_insert(vec![])
+                    .append(&mut splits.map(|split| split.to_string()).collect::<Vec<_>>());
+            }
+
+            for (key, values) in key_values {
+                filters.push(
+                    Filter::builder()
+                        .set_name(Some(format!("tag:{}", key)))
+                        .set_values(Some(values))
+                        .build(),
+                )
+            }
         }
 
         if let Some(id) = describe_images.snapshot_id {
@@ -86,10 +99,95 @@ impl<'a> Builder<'a> {
         let builder = builder.unused().await?;
 
         if let Some(images) = builder.describe_images_output.images() {
-            log::info!("Found {} unused images", images.len());
+            log::info!("{} of them are unused", images.len());
         }
 
         Ok(builder)
+    }
+
+    pub fn exclude_names(self, names: Vec<String>) -> Self {
+        let regex = regex::RegexSet::new(names).expect("Failed to build regex");
+
+        let describe_images_output = DescribeImagesOutput::builder()
+            .set_images(self.describe_images_output.images.map(|images| {
+                images
+                    .into_iter()
+                    .filter(|image| {
+                        regex
+                            .matches(image.name().expect("Failed to read image name"))
+                            .into_iter()
+                            .collect::<Vec<_>>()
+                            .is_empty()
+                    })
+                    .collect::<Vec<_>>()
+            }))
+            .build();
+
+        if let Some(images) = describe_images_output.images() {
+            log::info!("Kept {} after excluding by name", images.len());
+        }
+
+        Self {
+            client: self.client,
+            describe_images_output,
+        }
+    }
+
+    pub fn exclude_tags(self, tags: Vec<String>) -> Self {
+        let mut key_values = HashMap::new();
+
+        for tag in tags {
+            let mut splits = tag.split(" ");
+            key_values
+                .entry(splits.next().expect("Failed to read tag's key").to_string())
+                .or_insert(vec![])
+                .append(&mut splits.map(|split| split.to_string()).collect::<Vec<_>>());
+        }
+
+        let key_values = key_values
+            .into_iter()
+            .map(|(key, values)| {
+                (
+                    regex::Regex::new(&key).expect("Faild to compile regex"),
+                    regex::RegexSet::new(values).expect("Failed to compile regex set"),
+                )
+            })
+            .collect::<Vec<_>>();
+
+        let describe_images_output = DescribeImagesOutput::builder()
+            .set_images(self.describe_images_output.images.map(|images| {
+                images
+                    .into_iter()
+                    .filter(|image| {
+                        if let Some(tags) = image.tags() {
+                            let mut matches = false;
+                            for tag in tags {
+                                if let (Some(key), Some(value)) = (tag.key(), tag.value()) {
+                                    for (k, v) in &key_values {
+                                        matches |= k.is_match(key) && v.is_match(value);
+                                        if matches {
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                            matches
+                        } else {
+                            false
+                        }
+                    })
+                    .collect::<Vec<_>>()
+            }))
+            .build();
+
+        if let Some(images) = describe_images_output.images() {
+            log::info!("Kept {} after excluding by tag", images.len());
+        }
+
+        Self {
+            client: self.client,
+            describe_images_output,
+        }
     }
 
     pub fn keep(self, keep: usize) -> Self {
