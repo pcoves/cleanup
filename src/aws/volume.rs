@@ -9,21 +9,21 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Default)]
 pub struct DescribeVolumes {
-    name: Option<String>,
-    snapshot_id: Option<String>,
+    names: Option<Vec<String>>,
+    snapshot_ids: Option<Vec<String>>,
 }
 
 impl DescribeVolumes {
-    pub fn name(name: Option<String>) -> Self {
+    pub fn names(names: Option<Vec<String>>) -> Self {
         Self {
-            name,
+            names,
             ..Default::default()
         }
     }
 
-    pub fn snapshot_id(snapshot_id: Option<String>) -> Self {
+    pub fn snapshot_ids(snapshot_ids: Option<Vec<String>>) -> Self {
         Self {
-            snapshot_id,
+            snapshot_ids,
             ..Default::default()
         }
     }
@@ -38,20 +38,20 @@ impl From<DescribeVolumes> for Filters {
             .set_values(Some(vec!["available".to_owned()]))
             .build()];
 
-        if let Some(snapshot_id) = describe_volumes.snapshot_id {
+        if describe_volumes.snapshot_ids.is_some() {
             filters.push(
                 Filter::builder()
                     .set_name(Some("snapshot-id".to_owned()))
-                    .set_values(Some(vec![snapshot_id]))
+                    .set_values(describe_volumes.snapshot_ids)
                     .build(),
             )
         }
 
-        if let Some(name) = describe_volumes.name {
+        if describe_volumes.names.is_some() {
             filters.push(
                 Filter::builder()
                     .set_name(Some("tag:Name".to_owned()))
-                    .set_values(Some(vec![name]))
+                    .set_values(describe_volumes.names)
                     .build(),
             )
         }

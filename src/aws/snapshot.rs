@@ -12,21 +12,21 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Default)]
 pub struct DescribeSnapshots {
-    pub name: Option<String>,
-    pub snapshot_id: Option<String>,
+    pub names: Option<Vec<String>>,
+    pub snapshot_ids: Option<Vec<String>>,
 }
 
 impl DescribeSnapshots {
-    pub fn name(name: Option<String>) -> Self {
+    pub fn names(names: Option<Vec<String>>) -> Self {
         Self {
-            name,
+            names,
             ..Default::default()
         }
     }
 
-    pub fn snapshot_id(snapshot_id: Option<String>) -> Self {
+    pub fn snapshot_ids(snapshot_ids: Option<Vec<String>>) -> Self {
         Self {
-            snapshot_id,
+            snapshot_ids,
             ..Default::default()
         }
     }
@@ -38,20 +38,20 @@ impl From<DescribeSnapshots> for Filters {
     fn from(describe_snapshots: DescribeSnapshots) -> Self {
         let mut filters = vec![];
 
-        if let Some(name) = describe_snapshots.name {
+        if describe_snapshots.names.is_some() {
             filters.push(
                 Filter::builder()
                     .set_name(Some("tag:Name".to_owned()))
-                    .set_values(Some(vec![name]))
+                    .set_values(describe_snapshots.names)
                     .build(),
             );
         }
 
-        if let Some(id) = describe_snapshots.snapshot_id {
+        if describe_snapshots.snapshot_ids.is_some() {
             filters.push(
                 Filter::builder()
                     .set_name(Some("snapshot-id".to_owned()))
-                    .set_values(Some(vec![id]))
+                    .set_values(describe_snapshots.snapshot_ids)
                     .build(),
             );
         }
@@ -113,12 +113,10 @@ impl Info {
 
         if let Ok(builder) = VolumesBuilder::new(
             &client,
-            DescribeVolumes::snapshot_id(Some(
-                snapshot
-                    .snapshot_id()
-                    .expect("Failed to read snapshot's ID")
-                    .to_string(),
-            )),
+            DescribeVolumes::snapshot_ids(Some(vec![snapshot
+                .snapshot_id()
+                .expect("Failed to read snapshot's ID")
+                .to_string()])),
         )
         .await
         {

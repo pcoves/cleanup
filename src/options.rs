@@ -40,7 +40,7 @@ pub struct Volume {
 
     /// Filter by Tag:Name.
     #[clap(short, long)]
-    pub name: Option<String>,
+    pub names: Option<Vec<String>>,
 
     /// Save result for later deletion
     #[clap(short, long)]
@@ -55,7 +55,7 @@ pub struct Snapshot {
 
     /// Filter by Tag:Name.
     #[clap(short, long)]
-    pub name: Option<String>,
+    pub names: Option<Vec<String>>,
 
     /// Save result for later deletion
     #[clap(short, long)]
@@ -70,11 +70,11 @@ pub struct Image {
 
     /// Filter by Tag:Name.
     #[clap(short, long)]
-    pub tag: Option<String>,
+    pub tags: Option<Vec<String>>,
 
     /// Filter by image name/prefix,
     #[clap(short, long)]
-    pub name: Option<String>,
+    pub names: Option<Vec<String>>,
 
     /// Save result for later deletion
     #[clap(short, long)]

@@ -32,7 +32,7 @@ async fn main() -> Result<()> {
     match options.command {
         Command::Volume(command) => {
             if let Ok(builder) =
-                VolumesBuilder::new(&client, DescribeVolumes::name(command.name)).await
+                VolumesBuilder::new(&client, DescribeVolumes::names(command.names)).await
             {
                 let out = Out::Volumes(builder.build().await);
                 if let Some(path) = command.output {
@@ -46,7 +46,7 @@ async fn main() -> Result<()> {
         }
         Command::Snapshot(command) => {
             if let Ok(builder) =
-                SnapshotsBuilder::new(&client, DescribeSnapshots::name(command.name)).await
+                SnapshotsBuilder::new(&client, DescribeSnapshots::names(command.names)).await
             {
                 let out = Out::Snapshots(builder.build().await);
                 if let Some(path) = command.output {
@@ -62,8 +62,8 @@ async fn main() -> Result<()> {
             if let Ok(builder) = ImagesBuilder::new(
                 &client,
                 DescribeImages {
-                    name: command.name,
-                    tag: command.tag,
+                    names: command.names,
+                    tags: command.tags,
                     ..Default::default()
                 },
             )

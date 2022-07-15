@@ -13,8 +13,8 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Default)]
 pub struct DescribeImages {
-    pub name: Option<String>,
-    pub tag: Option<String>,
+    pub names: Option<Vec<String>>,
+    pub tags: Option<Vec<String>>,
     pub snapshot_id: Option<String>,
 }
 
@@ -24,20 +24,20 @@ impl From<DescribeImages> for Filters {
     fn from(describe_images: DescribeImages) -> Self {
         let mut filters = vec![];
 
-        if let Some(name) = describe_images.name {
+        if describe_images.names.is_some() {
             filters.push(
                 Filter::builder()
                     .set_name(Some("name".to_owned()))
-                    .set_values(Some(vec![name]))
+                    .set_values(describe_images.names)
                     .build(),
             )
         }
 
-        if let Some(tag) = describe_images.tag {
+        if describe_images.tags.is_some() {
             filters.push(
                 Filter::builder()
                     .set_name(Some("tag:Name".to_owned()))
-                    .set_values(Some(vec![tag]))
+                    .set_values(describe_images.tags)
                     .build(),
             )
         }
@@ -238,7 +238,7 @@ impl Info {
                     if let Some(snapshot_id) = ebs.snapshot_id() {
                         if let Ok(builder) = SnapshotsBuilder::new(
                             &client,
-                            DescribeSnapshots::snapshot_id(Some(snapshot_id.to_string())),
+                            DescribeSnapshots::snapshot_ids(Some(vec![snapshot_id.to_string()])),
                         )
                         .await
                         {
