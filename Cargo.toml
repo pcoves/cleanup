@@ -1,6 +1,6 @@
 [package]
 name = "cleanup"
-version = "0.4.1"
+version = "0.5.0"
 edition = "2021"
 authors = ["Pablo COVES <pablo.coves@protonmail.com>"]
 license = "MIT"
@@ -12,11 +12,21 @@ codegen-units = 1
 panic = "abort"
 
 [dependencies]
-aws-config     = { version = "0.9"                                         }
-aws-sdk-ec2    = { version = "0.9"                                         }
+aws-config     = { version = "0.15"                                        }
+aws-sdk-ec2    = { version = "0.15"                                        }
 
 chrono         = { version = "0.4"                                         }
 clap           = { version = "3", features = ["derive"]                    }
+env_logger     = { version = "0.9"                                         }
 futures        = { version = "0.3"                                         }
+log            = { version = "0.4"                                         }
+regex          = { version = "1"                                           }
+serde          = { version = "1.0", features = ["derive"]                  }
+serde_json     = { version = "1.0"                                         }
 thiserror      = { version = "1"                                           }
 tokio          = { version = "1", features = ["macros", "rt-multi-thread"] }
+
+[build-dependencies]
+chrono        = { version = "0.4"                      }
+clap          = { version = "3", features = ["derive"] }
+clap_complete = { version = "3"                        }

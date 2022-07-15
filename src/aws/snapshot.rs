@@ -1,27 +1,32 @@
 use crate::{
-    aws::volume::{DescribeVolumes, Volumes},
+    aws::volume::{Builder as VolumesBuilder, DescribeVolumes, Volumes},
     error::Result,
 };
-use aws_sdk_ec2::{model::Filter, output::DescribeSnapshotsOutput, Client};
+use aws_sdk_ec2::{
+    model::{Filter, Snapshot},
+    output::DescribeSnapshotsOutput,
+    Client,
+};
 use futures::future::join_all;
+use serde::{Deserialize, Serialize};
 
 #[derive(Default)]
 pub struct DescribeSnapshots {
-    pub name: Option<String>,
-    pub snapshot_id: Option<String>,
+    pub names: Option<Vec<String>>,
+    pub snapshot_ids: Option<Vec<String>>,
 }
 
 impl DescribeSnapshots {
-    pub fn name(name: Option<String>) -> Self {
+    pub fn names(names: Option<Vec<String>>) -> Self {
         Self {
-            name,
+            names,
             ..Default::default()
         }
     }
 
-    pub fn snapshot_id(snapshot_id: Option<String>) -> Self {
+    pub fn snapshot_ids(snapshot_ids: Option<Vec<String>>) -> Self {
         Self {
-            snapshot_id,
+            snapshot_ids,
             ..Default::default()
         }
     }
@@ -33,20 +38,20 @@ impl From<DescribeSnapshots> for Filters {
     fn from(describe_snapshots: DescribeSnapshots) -> Self {
         let mut filters = vec![];
 
-        if let Some(name) = describe_snapshots.name {
+        if describe_snapshots.names.is_some() {
             filters.push(
                 Filter::builder()
                     .set_name(Some("tag:Name".to_owned()))
-                    .set_values(Some(vec![name]))
+                    .set_values(describe_snapshots.names)
                     .build(),
             );
         }
 
-        if let Some(id) = describe_snapshots.snapshot_id {
+        if describe_snapshots.snapshot_ids.is_some() {
             filters.push(
                 Filter::builder()
                     .set_name(Some("snapshot-id".to_owned()))
-                    .set_values(Some(vec![id]))
+                    .set_values(describe_snapshots.snapshot_ids)
                     .build(),
             );
         }
@@ -55,16 +60,16 @@ impl From<DescribeSnapshots> for Filters {
     }
 }
 
-pub struct Snapshots<'a> {
+pub struct Builder<'a> {
     client: &'a Client,
     output: DescribeSnapshotsOutput,
 }
 
-impl<'a> Snapshots<'a> {
+impl<'a> Builder<'a> {
     pub async fn new(
         client: &'a Client,
         describe_snapshots: DescribeSnapshots,
-    ) -> Result<Snapshots<'a>> {
+    ) -> Result<Builder<'a>> {
         Ok(Self {
             client,
             output: client
@@ -75,85 +80,96 @@ impl<'a> Snapshots<'a> {
         })
     }
 
-    pub async fn delete(&self) -> Result<()> {
-        if let Some(snapshots) = self.output.snapshots() {
-            join_all(snapshots.iter().map(|snapshot| {
-                self.client
-                    .delete_snapshot()
-                    .snapshot_id(snapshot.snapshot_id().unwrap())
-                    .send()
-            }))
-            .await;
-
-            join_all(
-                join_all(snapshots.iter().map(|snapshot| {
-                    Volumes::new(
-                        self.client,
-                        DescribeVolumes::snapshot_id(snapshot.snapshot_id().map(|s| s.to_string())),
-                    )
-                }))
-                .await
-                .into_iter()
-                .map(|volumes| volumes.unwrap())
-                .collect::<Vec<_>>()
-                .iter()
-                .map(|volumes| volumes.delete()),
+    pub async fn build(self) -> Snapshots {
+        Snapshots(if let Some(snapshots) = self.output.snapshots() {
+            Some(
+                join_all(
+                    snapshots
+                        .iter()
+                        .map(|snapshot| Info::new(self.client, snapshot)),
+                )
+                .await,
             )
-            .await;
+        } else {
+            None
+        })
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct Snapshots(Option<Vec<Info>>);
+
+#[derive(Serialize, Deserialize)]
+pub struct Info {
+    id: String,
+    name: String,
+    size: i32,
+    volumes: Option<Vec<Volumes>>,
+}
+
+impl Info {
+    pub async fn new(client: &Client, snapshot: &Snapshot) -> Self {
+        let mut acc: Vec<Volumes> = Vec::new();
+
+        if let Ok(builder) = VolumesBuilder::new(
+            &client,
+            DescribeVolumes::snapshot_ids(Some(vec![snapshot
+                .snapshot_id()
+                .expect("Failed to read snapshot's ID")
+                .to_string()])),
+        )
+        .await
+        {
+            acc.push(builder.build().await)
+        }
+
+        Self {
+            id: snapshot
+                .snapshot_id()
+                .expect("Failed to read snapshot ID")
+                .to_string(),
+            name: snapshot
+                .tags()
+                .unwrap_or(&[])
+                .iter()
+                .find(|tag| tag.key() == Some(&"Name".to_owned()))
+                .map(|tag| tag.value().unwrap())
+                .unwrap_or("")
+                .to_string(),
+            size: snapshot
+                .volume_size()
+                .expect("Failed to read snapshot's size"),
+            volumes: Some(acc),
+        }
+    }
+
+    pub async fn delete(&self, client: &Client) -> Result<()> {
+        client
+            .delete_snapshot()
+            .snapshot_id(&self.id)
+            .send()
+            .await?;
+        if let Some(volumes) = &self.volumes {
+            join_all(volumes.iter().map(|volume| volume.cleanup(client))).await;
         }
         Ok(())
     }
 }
 
-impl<'a> std::fmt::Display for Snapshots<'a> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let Some(snapshots) = self.output.snapshots() {
-            let (mut id, mut name, mut total): (usize, usize, usize) = (0, 0, 0);
-
-            for snapshot in snapshots {
-                let len = snapshot.snapshot_id().map(|id| id.len()).unwrap_or(0);
-                if len > id {
-                    id = len;
-                }
-
-                if let Some(tags) = snapshot.tags() {
-                    if let Some(tag) = tags
-                        .iter()
-                        .find(|tag| tag.key() == Some(&"Name".to_owned()))
-                    {
-                        let len = tag.value().map(|value| value.len()).unwrap_or(0);
-                        if len > name {
-                            name = len;
-                        }
-                    }
-                }
-
-                total += snapshot.volume_size().unwrap() as usize;
-            }
-            let size = total.to_string().len();
-
-            for snapshot in snapshots {
-                let snapshot_id = snapshot.snapshot_id.as_ref().unwrap();
-                let snapshot_name = snapshot
-                    .tags()
-                    .unwrap_or(&[])
-                    .iter()
-                    .find(|tag| tag.key() == Some(&"Name".to_owned()))
-                    .map(|tag| tag.value().unwrap())
-                    .unwrap_or("");
-                let snapshot_size = snapshot.volume_size().unwrap_or(0);
-
-                writeln!(
-                    f,
-                    "| {:id$} | {:name$} | {:>size$}Go |",
-                    snapshot_id, snapshot_name, snapshot_size
-                )?;
-            }
-
-            let size = id + name + total.to_string().len();
-            writeln!(f, "| Total {:>size$}Go |", total)
-        } else {
-            writeln!(f, "No volumes found")
+impl Snapshots {
+    pub async fn cleanup(&self, client: &Client) {
+        if let Some(snapshots) = &self.0 {
+            join_all(snapshots.iter().map(|volume| volume.delete(client))).await;
         }
+    }
+}
+
+impl std::fmt::Display for Snapshots {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(
+            f,
+            "{}",
+            serde_json::to_string_pretty(&self).expect("Serialization failure")
+        )
     }
 }
